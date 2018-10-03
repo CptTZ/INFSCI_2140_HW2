@@ -73,7 +73,7 @@ public class MyIndexWriter {
 
         try (FileOutputStream fos = new FileOutputStream(this.indexPath + "docidx")) {
             ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(fos));
-            oos.writeObject(this.docIdIndex);
+            oos.writeObject(new ArrayList<>(this.docIdIndex));
             oos.close();
         }
 

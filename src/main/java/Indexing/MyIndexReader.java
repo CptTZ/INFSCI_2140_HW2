@@ -9,12 +9,11 @@ import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
 
 
 public class MyIndexReader {
 
-    private LinkedList<String> docIdIndex;
+    private ArrayList<String> docIdIndex;
     private HashMap<String, ArrayList<Integer>> allTermMap;
     private ArrayList<Integer> emptyList = new ArrayList<>(0);
 
@@ -52,7 +51,7 @@ public class MyIndexReader {
         try (FileInputStream fis = new FileInputStream(base + "docidx")) {
             ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(fis));
             try {
-                this.docIdIndex = (LinkedList<String>) ois.readObject();
+                this.docIdIndex = (ArrayList<String>) ois.readObject();
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();
             }
