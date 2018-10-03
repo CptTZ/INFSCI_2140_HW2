@@ -2,20 +2,15 @@ package Indexing;
 
 import Classes.Path;
 
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
+import java.io.*;
+import java.util.*;
 
 
 public class MyIndexReader {
 
     private ArrayList<String> docIdIndex;
-    private HashMap<String, ArrayList<Integer>> allTermMap;
-    private ArrayList<Integer> emptyList = new ArrayList<>(0);
+    private HashMap<String, String[]> allTermMap = new HashMap<>();
+    private String[] emptyList = new String[0];
 
     /**
      * read the index files you generated in task 1
@@ -38,17 +33,15 @@ public class MyIndexReader {
      * Read in objects
      */
     private void readInAllData(String base) throws IOException {
-        try (FileInputStream fis = new FileInputStream(base + "terms")) {
-            ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(fis));
-            try {
-                this.allTermMap = (HashMap<String, ArrayList<Integer>>) ois.readObject();
-            } catch (ClassNotFoundException e) {
-                e.printStackTrace();
+        try (BufferedReader br = new BufferedReader(new FileReader(base + "terms.idx"))) {
+            String raw;
+            while ((raw = br.readLine()) != null) {
+                String[] data = raw.split(":");
+                this.allTermMap.put(data[0], data[1].split(","));
             }
-            ois.close();
         }
 
-        try (FileInputStream fis = new FileInputStream(base + "docidx")) {
+        try (FileInputStream fis = new FileInputStream(base + "doc.idx")) {
             ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(fis));
             try {
                 this.docIdIndex = (ArrayList<String>) ois.readObject();
@@ -98,14 +91,14 @@ public class MyIndexReader {
      * NOTE that the returned posting list array should be ranked by docid from the smallest to the largest.
      */
     public int[][] GetPostingList(String token) throws IOException {
-        ArrayList<Integer> allDocs = this.allTermMap.getOrDefault(token, emptyList);
-        HashSet<Integer> docsSet = new HashSet<>(allDocs);
+        List<String> allDocs = Arrays.asList(this.allTermMap.getOrDefault(token, emptyList));
+        HashSet<String> docsSet = new HashSet<>(allDocs);
 
         int docidLen = docsSet.size();
         int[][] res = new int[docidLen][2];
         int i = 0;
-        for (Integer docid : docsSet) {
-            res[i][0] = docid;
+        for (String docid : docsSet) {
+            res[i][0] = Integer.parseInt(docid);
             res[i][1] = (int) allDocs.parallelStream().filter(id -> id.equals(docid)).count();
             i++;
         }
@@ -116,7 +109,7 @@ public class MyIndexReader {
      * Return the number of documents that contains the token.
      */
     public int GetDocFreq(String token) throws IOException {
-        ArrayList<Integer> res = this.allTermMap.getOrDefault(token, emptyList);
+        List<String> res = Arrays.asList(this.allTermMap.getOrDefault(token, emptyList));
         return new HashSet<>(res).size();
     }
 
@@ -124,12 +117,14 @@ public class MyIndexReader {
      * Return the total number of times the token appears in the collection.
      */
     public long GetCollectionFreq(String token) throws IOException {
-        return this.allTermMap.getOrDefault(token, emptyList).size();
+        return this.allTermMap.getOrDefault(token, emptyList).length;
     }
 
     public void Close() throws IOException {
         this.allTermMap.clear();
         this.docIdIndex.clear();
+        this.allTermMap = null;
+        this.docIdIndex = null;
         System.gc();
     }
 

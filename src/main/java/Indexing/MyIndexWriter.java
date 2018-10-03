@@ -6,6 +6,8 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class MyIndexWriter {
 
@@ -65,18 +67,26 @@ public class MyIndexWriter {
     public void Close() throws IOException {
         if (this.totalNumOfDocument != this.docIdIndex.size()) throw new RuntimeException("Inbalance tree!");
 
-        try (FileOutputStream fos = new FileOutputStream(this.indexPath + "terms")) {
-            ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(fos));
-            oos.writeObject(this.allTermMap);
-            oos.close();
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(this.indexPath + "terms.idx"))) {
+            this.allTermMap.forEach((term, idList) -> {
+                try {
+                    bw.write(String.format("%s:%s%n", term,
+                            idList.parallelStream().map(Objects::toString).collect(Collectors.joining(","))
+                    ));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
         }
 
-        try (FileOutputStream fos = new FileOutputStream(this.indexPath + "docidx")) {
+        try (FileOutputStream fos = new FileOutputStream(this.indexPath + "doc.idx")) {
             ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(fos));
             oos.writeObject(new ArrayList<>(this.docIdIndex));
             oos.close();
         }
 
+        this.allTermMap.clear();
+        this.docIdIndex.clear();
         this.allTermMap = null;
         this.docIdIndex = null;
         System.gc();
