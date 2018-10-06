@@ -31,7 +31,7 @@ public class PreProcessedCorpusReader {
             this.corpusReader.close();
             return null;
         }
-        Map<String, String> res = new HashMap<>();
+        Map<String, String> res = new HashMap<>(2,1f);
         res.put("DOCNO", docNo.trim());
         String content = this.corpusReader.readLine();
         res.put("CONTENT", content == null ? "" : content.trim());
