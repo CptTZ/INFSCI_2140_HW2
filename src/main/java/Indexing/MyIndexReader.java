@@ -15,6 +15,9 @@ public class MyIndexReader {
     private String[] emptyList = new String[0];
     private String termPathTemplate;
 
+    /**
+     * Local cache for token lookups
+     */
     private HashMap<String, ArrayList<String>> tokenCache = new HashMap<>();
 
     /**
@@ -105,8 +108,12 @@ public class MyIndexReader {
         return res;
     }
 
+    /**
+     * Add data to local cache for faster access
+     */
     private void populateLocalCache(String token) throws IOException {
         if (!this.tokenCache.containsKey(token)) {
+            // Flush cache if it's too large
             if (this.tokenCache.size() > Config.MAX_LOCAL_CACHE_ENTRIES) clearAllTokenCache();
             this.tokenCache.put(token, findOneTermPostings(token));
         }
@@ -118,6 +125,7 @@ public class MyIndexReader {
     private ArrayList<String> findOneTermPostings(String term) throws IOException {
         int termLen = term.length();
         ArrayList<String> res = new ArrayList<>(0);
+        // Read Gzipped index file
         GZIPInputStream gzIn = new GZIPInputStream(new FileInputStream(new File(String.format(this.termPathTemplate, termLen))));
         BufferedReader br = new BufferedReader(new InputStreamReader(gzIn, Charset.defaultCharset()));
 

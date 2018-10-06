@@ -23,6 +23,9 @@ public class MyIndexWriter {
     private LinkedList<String> docIdIndex = new LinkedList<>();
     private int totalNumOfDocument = 0;
 
+    /**
+     * Two-layer structure for better performance
+     */
     private HashMap<Integer, HashMap<String, StringBuilder>> allTermMapByLength = new HashMap<>(100);
 
     /**
@@ -49,6 +52,7 @@ public class MyIndexWriter {
         this.docIdIndex.add(docno);
         String[] contents = content.split(" ");
         for (String s : contents) {
+            // Use the length of a term as a first-level index
             int c = s.length();
             HashMap<String, StringBuilder> termMap = this.allTermMapByLength.getOrDefault(c, new HashMap<>());
             if (termMap.size() == 0) {
@@ -58,6 +62,7 @@ public class MyIndexWriter {
             if (sb.length() == 0) {
                 termMap.put(s, sb);
             }
+            // Format data as "TERM|Posting1,Posting2,Posting3,...,"
             sb.append(totalNumOfDocument);
             sb.append(Config.TERM_POSTING_SPLITTER);
         }
@@ -73,8 +78,10 @@ public class MyIndexWriter {
 
         String termTemplate = this.indexPath + Config.TERM_INDEX_NAME;
 
+        // Write out posting file based on term length
         this.allTermMapByLength.forEach((termLength, termMap) -> {
             try {
+                // GZip the output to save storage
                 GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(new File(String.format(termTemplate, termLength))));
                 BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(gzOut, Charset.defaultCharset()));
                 termMap.forEach((term, idStringBuilder) -> {
@@ -97,6 +104,7 @@ public class MyIndexWriter {
             }
         });
 
+        // Document ID list save
         try (FileOutputStream fos = new FileOutputStream(this.indexPath + Config.DOC_INDEX_NAME)) {
             ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(new BufferedOutputStream(fos)));
             oos.writeObject(new ArrayList<>(this.docIdIndex));
