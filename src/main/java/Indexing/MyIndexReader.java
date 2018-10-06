@@ -1,8 +1,12 @@
 package Indexing;
 
+import Classes.Config;
 import Classes.Path;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.*;
@@ -31,7 +35,7 @@ public class MyIndexReader {
         } else {
             throw new IOException("Type error");
         }
-        this.termPathTemplate = basePath + "term_%d.idx";
+        this.termPathTemplate = basePath + Config.TERM_INDEX_NAME;
         readInAllData(basePath);
     }
 
@@ -39,7 +43,7 @@ public class MyIndexReader {
      * Read in objects
      */
     private void readInAllData(String base) throws IOException {
-        try (FileInputStream fis = new FileInputStream(base + "doc.idx")) {
+        try (FileInputStream fis = new FileInputStream(base + Config.DOC_INDEX_NAME)) {
             ObjectInputStream ois = new ObjectInputStream(new GZIPInputStream(new BufferedInputStream(fis)));
             try {
                 this.docIdIndex = (ArrayList<String>) ois.readObject();
@@ -107,7 +111,7 @@ public class MyIndexReader {
 
     private void populateLocalCache(String token) throws IOException {
         if (!this.tokenCache.containsKey(token)) {
-            if (this.tokenCache.size() > 99999) clearAllTokenCache();
+            if (this.tokenCache.size() > Config.MAX_LOCAL_CACHE_ENTRIES) clearAllTokenCache();
             this.tokenCache.put(token, findOneTermPostings(token));
         }
     }
@@ -122,13 +126,13 @@ public class MyIndexReader {
         Optional<String> termPos = Files.lines(java.nio.file.Paths.get("./",
                 String.format(this.termPathTemplate, termLen)), Charset.defaultCharset()).parallel()
                 .filter(s -> {
-                    String[] data = s.split("\\|");
+                    String[] data = s.split(Config.TERM_SPLITTER_REGEX);
                     if (data.length != 2) return false;
                     return data[0].equals(term);
                 }).findFirst();
 
         if (termPos.isPresent()) {
-            String[] pos = termPos.get().split("\\|")[1].split(",");
+            String[] pos = termPos.get().split(Config.TERM_SPLITTER_REGEX)[1].split(String.valueOf(Config.TERM_POSTING_SPLITTER));
             res = new ArrayList<>(pos.length);
             for (String p : pos) {
                 String pT = p.trim();

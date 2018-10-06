@@ -1,5 +1,6 @@
 package Indexing;
 
+import Classes.Config;
 import Classes.Path;
 
 import java.io.*;
@@ -57,7 +58,7 @@ public class MyIndexWriter {
                 termMap.put(s, sb);
             }
             sb.append(totalNumOfDocument);
-            sb.append(',');
+            sb.append(Config.TERM_POSTING_SPLITTER);
         }
         this.totalNumOfDocument++;
     }
@@ -69,14 +70,14 @@ public class MyIndexWriter {
     public void Close() throws IOException {
         if (this.totalNumOfDocument != this.docIdIndex.size()) throw new RuntimeException("Inbalance tree!");
 
-        String termTemplate = this.indexPath + "term_%d.idx";
+        String termTemplate = this.indexPath + Config.TERM_INDEX_NAME;
 
         this.allTermMapByLength.forEach((termHash, termMap) -> {
             try {
                 BufferedWriter bw = new BufferedWriter(new FileWriter(String.format(termTemplate, termHash)));
                 termMap.forEach((term, idStringBuilder) -> {
                     try {
-                        bw.write(String.format("%s|%s%n", term, idStringBuilder.toString()));
+                        bw.write(String.format(Config.TERM_MAPPER_FORMAT, term, idStringBuilder.toString()));
                         idStringBuilder.setLength(0);
                         idStringBuilder = null;
                     } catch (IOException e) {
@@ -94,7 +95,7 @@ public class MyIndexWriter {
             }
         });
 
-        try (FileOutputStream fos = new FileOutputStream(this.indexPath + "doc.idx")) {
+        try (FileOutputStream fos = new FileOutputStream(this.indexPath + Config.DOC_INDEX_NAME)) {
             ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(new BufferedOutputStream(fos)));
             oos.writeObject(new ArrayList<>(this.docIdIndex));
             oos.close();
