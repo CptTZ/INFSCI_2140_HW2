@@ -4,6 +4,7 @@ import Classes.Config;
 import Classes.Path;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -72,9 +73,10 @@ public class MyIndexWriter {
 
         String termTemplate = this.indexPath + Config.TERM_INDEX_NAME;
 
-        this.allTermMapByLength.forEach((termHash, termMap) -> {
+        this.allTermMapByLength.forEach((termLength, termMap) -> {
             try {
-                BufferedWriter bw = new BufferedWriter(new FileWriter(String.format(termTemplate, termHash)));
+                GZIPOutputStream gzOut = new GZIPOutputStream(new FileOutputStream(new File(String.format(termTemplate, termLength))));
+                BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(gzOut, Charset.defaultCharset()));
                 termMap.forEach((term, idStringBuilder) -> {
                     try {
                         bw.write(String.format(Config.TERM_MAPPER_FORMAT, term, idStringBuilder.toString()));
