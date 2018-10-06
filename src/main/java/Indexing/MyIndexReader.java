@@ -3,14 +3,18 @@ package Indexing;
 import Classes.Path;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.util.*;
+import java.util.zip.GZIPInputStream;
 
 
 public class MyIndexReader {
 
     private ArrayList<String> docIdIndex;
-    private HashMap<String, String[]> allTermMap = new HashMap<>();
     private String[] emptyList = new String[0];
+    private String termPathTemplate;
+
+    private HashMap<String, ArrayList<String>> tokenCache = new HashMap<>();
 
     /**
      * read the index files you generated in task 1
@@ -26,6 +30,7 @@ public class MyIndexReader {
         } else {
             throw new IOException("Type error");
         }
+        this.termPathTemplate = basePath + "term_%d.idx";
         readInAllData(basePath);
     }
 
@@ -33,16 +38,8 @@ public class MyIndexReader {
      * Read in objects
      */
     private void readInAllData(String base) throws IOException {
-        try (BufferedReader br = new BufferedReader(new FileReader(base + "terms.idx"))) {
-            String raw;
-            while ((raw = br.readLine()) != null) {
-                String[] data = raw.split(":");
-                this.allTermMap.put(data[0], data[1].split(","));
-            }
-        }
-
         try (FileInputStream fis = new FileInputStream(base + "doc.idx")) {
-            ObjectInputStream ois = new ObjectInputStream(new BufferedInputStream(fis));
+            ObjectInputStream ois = new ObjectInputStream(new GZIPInputStream(new BufferedInputStream(fis)));
             try {
                 this.docIdIndex = (ArrayList<String>) ois.readObject();
             } catch (ClassNotFoundException e) {
@@ -91,7 +88,9 @@ public class MyIndexReader {
      * NOTE that the returned posting list array should be ranked by docid from the smallest to the largest.
      */
     public int[][] GetPostingList(String token) throws IOException {
-        List<String> allDocs = Arrays.asList(this.allTermMap.getOrDefault(token, emptyList));
+        populateLocalCache(token);
+
+        List<String> allDocs = this.tokenCache.get(token);
         HashSet<String> docsSet = new HashSet<>(allDocs);
 
         int docidLen = docsSet.size();
@@ -105,11 +104,44 @@ public class MyIndexReader {
         return res;
     }
 
+    private void populateLocalCache(String token) throws IOException {
+        if (!this.tokenCache.containsKey(token)) {
+            this.tokenCache.put(token, findOneTermPostings(token));
+        }
+    }
+
+    /**
+     * Read data from one term
+     */
+    private ArrayList<String> findOneTermPostings(String term) throws IOException {
+        int termLen = term.length();
+        ArrayList<String> res = new ArrayList<>(0);
+
+        Optional<String> termPos = Files.lines(java.nio.file.Paths.get("./", String.format(this.termPathTemplate, termLen))).parallel()
+                .filter(s -> {
+                    String[] data = s.split(":");
+                    if (data.length != 2) return false;
+                    return data[0].equals(term);
+                }).findFirst();
+
+        if (termPos.isPresent()) {
+            String[] pos = termPos.get().split(":")[1].split(",");
+            res = new ArrayList<>(pos.length);
+            for (String p : pos) {
+                String pT = p.trim();
+                if (pT.isEmpty()) continue;
+                res.add(pT);
+            }
+        }
+        return res;
+    }
+
     /**
      * Return the number of documents that contains the token.
      */
     public int GetDocFreq(String token) throws IOException {
-        List<String> res = Arrays.asList(this.allTermMap.getOrDefault(token, emptyList));
+        populateLocalCache(token);
+        List<String> res = this.tokenCache.get(token);
         return new HashSet<>(res).size();
     }
 
@@ -117,13 +149,15 @@ public class MyIndexReader {
      * Return the total number of times the token appears in the collection.
      */
     public long GetCollectionFreq(String token) throws IOException {
-        return this.allTermMap.getOrDefault(token, emptyList).length;
+        populateLocalCache(token);
+        return this.tokenCache.get(token).size();
     }
 
     public void Close() throws IOException {
-        this.allTermMap.clear();
+        this.tokenCache.forEach((k, v) -> v.clear());
+        this.tokenCache.clear();
+        this.tokenCache = null;
         this.docIdIndex.clear();
-        this.allTermMap = null;
         this.docIdIndex = null;
         System.gc();
     }

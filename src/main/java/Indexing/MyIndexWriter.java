@@ -6,8 +6,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.Objects;
-import java.util.stream.Collectors;
+import java.util.zip.GZIPOutputStream;
 
 public class MyIndexWriter {
 
@@ -22,10 +21,7 @@ public class MyIndexWriter {
     private LinkedList<String> docIdIndex = new LinkedList<>();
     private int totalNumOfDocument = 0;
 
-    /**
-     * Map each term by its length
-     */
-    private HashMap<String, ArrayList<Integer>> allTermMap = new HashMap<>(200000);
+    private HashMap<Integer, HashMap<String, LinkedList<Integer>>> allTermMapByLength = new HashMap<>(100);
 
     /**
      * This constructor should initiate the FileWriter to output your index files
@@ -51,9 +47,14 @@ public class MyIndexWriter {
         this.docIdIndex.add(docno);
         String[] contents = content.split(" ");
         for (String s : contents) {
-            ArrayList<Integer> list = this.allTermMap.getOrDefault(s, new ArrayList<>());
+            int c = s.length();
+            HashMap<String, LinkedList<Integer>> termMap = this.allTermMapByLength.getOrDefault(c, new HashMap<>());
+            if (termMap.size() == 0) {
+                this.allTermMapByLength.put(c, termMap);
+            }
+            LinkedList<Integer> list = termMap.getOrDefault(s, new LinkedList<>());
             if (list.size() == 0) {
-                this.allTermMap.put(s, list);
+                termMap.put(s, list);
             }
             list.add(totalNumOfDocument);
         }
@@ -67,29 +68,43 @@ public class MyIndexWriter {
     public void Close() throws IOException {
         if (this.totalNumOfDocument != this.docIdIndex.size()) throw new RuntimeException("Inbalance tree!");
 
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(this.indexPath + "terms.idx"))) {
-            this.allTermMap.forEach((term, idList) -> {
-                try {
-                    bw.write(String.format("%s:%s%n", term,
-                            idList.parallelStream().map(Objects::toString).collect(Collectors.joining(","))
-                    ));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-        }
+        String termTemplate = this.indexPath + "term_%d.idx";
+
+        this.allTermMapByLength.forEach((termHash, termMap) -> {
+            try {
+                BufferedWriter bw = new BufferedWriter(new FileWriter(String.format(termTemplate, termHash)));
+                termMap.forEach((term, idList) -> {
+                    try {
+                        StringBuilder sb = new StringBuilder();
+                        for (Integer i : idList) {
+                            sb.append(i);
+                            sb.append(',');
+                        }
+                        // Free memory
+                        idList.clear();
+                        idList = null;
+                        bw.write(String.format("%s:%s%n", term, sb.toString()));
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+                bw.close();
+                // Deep free memory
+                termMap.clear();
+                System.gc();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
 
         try (FileOutputStream fos = new FileOutputStream(this.indexPath + "doc.idx")) {
-            ObjectOutputStream oos = new ObjectOutputStream(new BufferedOutputStream(fos));
+            ObjectOutputStream oos = new ObjectOutputStream(new GZIPOutputStream(new BufferedOutputStream(fos)));
             oos.writeObject(new ArrayList<>(this.docIdIndex));
             oos.close();
         }
 
-        this.allTermMap.clear();
         this.docIdIndex.clear();
-        this.allTermMap = null;
         this.docIdIndex = null;
-        System.gc();
     }
 
 }
