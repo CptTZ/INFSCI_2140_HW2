@@ -21,7 +21,7 @@ public class MyIndexWriter {
     private LinkedList<String> docIdIndex = new LinkedList<>();
     private int totalNumOfDocument = 0;
 
-    private HashMap<Integer, HashMap<String, LinkedList<Integer>>> allTermMapByLength = new HashMap<>(100);
+    private HashMap<Integer, HashMap<String, StringBuilder>> allTermMapByLength = new HashMap<>(100);
 
     /**
      * This constructor should initiate the FileWriter to output your index files
@@ -48,15 +48,16 @@ public class MyIndexWriter {
         String[] contents = content.split(" ");
         for (String s : contents) {
             int c = s.length();
-            HashMap<String, LinkedList<Integer>> termMap = this.allTermMapByLength.getOrDefault(c, new HashMap<>());
+            HashMap<String, StringBuilder> termMap = this.allTermMapByLength.getOrDefault(c, new HashMap<>());
             if (termMap.size() == 0) {
                 this.allTermMapByLength.put(c, termMap);
             }
-            LinkedList<Integer> list = termMap.getOrDefault(s, new LinkedList<>());
-            if (list.size() == 0) {
-                termMap.put(s, list);
+            StringBuilder sb = termMap.getOrDefault(s, new StringBuilder());
+            if (sb.length() == 0) {
+                termMap.put(s, sb);
             }
-            list.add(totalNumOfDocument);
+            sb.append(totalNumOfDocument);
+            sb.append(',');
         }
         this.totalNumOfDocument++;
     }
@@ -73,17 +74,11 @@ public class MyIndexWriter {
         this.allTermMapByLength.forEach((termHash, termMap) -> {
             try {
                 BufferedWriter bw = new BufferedWriter(new FileWriter(String.format(termTemplate, termHash)));
-                termMap.forEach((term, idList) -> {
+                termMap.forEach((term, idStringBuilder) -> {
                     try {
-                        StringBuilder sb = new StringBuilder();
-                        for (Integer i : idList) {
-                            sb.append(i);
-                            sb.append(',');
-                        }
-                        // Free memory
-                        idList.clear();
-                        idList = null;
-                        bw.write(String.format("%s:%s%n", term, sb.toString()));
+                        bw.write(String.format("%s|%s%n", term, idStringBuilder.toString()));
+                        idStringBuilder.setLength(0);
+                        idStringBuilder = null;
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -91,9 +86,11 @@ public class MyIndexWriter {
                 bw.close();
                 // Deep free memory
                 termMap.clear();
-                System.gc();
+                termMap = null;
             } catch (IOException e) {
                 e.printStackTrace();
+            } finally {
+                System.gc();
             }
         });
 
@@ -103,6 +100,8 @@ public class MyIndexWriter {
             oos.close();
         }
 
+        this.allTermMapByLength.clear();
+        this.allTermMapByLength = null;
         this.docIdIndex.clear();
         this.docIdIndex = null;
     }

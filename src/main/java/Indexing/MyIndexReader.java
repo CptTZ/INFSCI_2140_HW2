@@ -3,6 +3,7 @@ package Indexing;
 import Classes.Path;
 
 import java.io.*;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
@@ -106,6 +107,7 @@ public class MyIndexReader {
 
     private void populateLocalCache(String token) throws IOException {
         if (!this.tokenCache.containsKey(token)) {
+            if (this.tokenCache.size() > 99999) clearAllTokenCache();
             this.tokenCache.put(token, findOneTermPostings(token));
         }
     }
@@ -117,15 +119,16 @@ public class MyIndexReader {
         int termLen = term.length();
         ArrayList<String> res = new ArrayList<>(0);
 
-        Optional<String> termPos = Files.lines(java.nio.file.Paths.get("./", String.format(this.termPathTemplate, termLen))).parallel()
+        Optional<String> termPos = Files.lines(java.nio.file.Paths.get("./",
+                String.format(this.termPathTemplate, termLen)), Charset.defaultCharset()).parallel()
                 .filter(s -> {
-                    String[] data = s.split(":");
+                    String[] data = s.split("\\|");
                     if (data.length != 2) return false;
                     return data[0].equals(term);
                 }).findFirst();
 
         if (termPos.isPresent()) {
-            String[] pos = termPos.get().split(":")[1].split(",");
+            String[] pos = termPos.get().split("\\|")[1].split(",");
             res = new ArrayList<>(pos.length);
             for (String p : pos) {
                 String pT = p.trim();
@@ -153,9 +156,17 @@ public class MyIndexReader {
         return this.tokenCache.get(token).size();
     }
 
-    public void Close() throws IOException {
-        this.tokenCache.forEach((k, v) -> v.clear());
+    private void clearAllTokenCache() {
+        this.tokenCache.forEach((k, v) -> {
+            v.clear();
+            v = null;
+        });
         this.tokenCache.clear();
+        System.gc();
+    }
+
+    public void Close() throws IOException {
+        clearAllTokenCache();
         this.tokenCache = null;
         this.docIdIndex.clear();
         this.docIdIndex = null;
